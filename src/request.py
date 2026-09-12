@@ -23,7 +23,7 @@ def main():
     lat = float(coords["lat"])
     lon = float(coords["lon"])
 
-    print(f"Координаты {country}: lat={lat}, lon={lon}")
+    print(f"Координаты {country}: lat={lat}, lon={lon}") # from openstreetmapapi
 
     if os.path.exists(_CREDENTIALS_PATH):
         tm = TokenManager.from_json_file(_CREDENTIALS_PATH)
