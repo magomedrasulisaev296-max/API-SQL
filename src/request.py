@@ -17,7 +17,7 @@ def main():
 
     if not coords:
         print(f"Не удалось получить координаты для {country}")
-        return
+        return #
 
     # Берём lat и lon из первого результата
     lat = float(coords["lat"])
