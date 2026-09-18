@@ -1,10 +1,9 @@
 import os
-
+from dotenv import load_dotenv
 from opensky_api import OpenSkyApi, TokenManager
+from src.openstreetmapapi import get_country_coords
 
-from src.openstreetmapapi import get_country_coords  # твой модуль
-
-_CREDENTIALS_PATH = "credentials.json"
+load_dotenv()
 
 
 def fmt_alt(value):
@@ -12,30 +11,28 @@ def fmt_alt(value):
 
 
 def main():
-    country = "Germany"  # или любая другая страна
+    country = "Germany"
     coords = get_country_coords(country)
 
     if not coords:
         print(f"Не удалось получить координаты для {country}")
-        return #
+        return
 
-    # Берём lat и lon из первого результата
     lat = float(coords["lat"])
     lon = float(coords["lon"])
+    print(f"Координаты {country}: lat={lat}, lon={lon}")
 
-    print(f"Координаты {country}: lat={lat}, lon={lon}") # from openstreetmapapi
+    client_id = os.getenv("CLIENT_ID")
+    client_secret = os.getenv("CLIENT_SECRET")
 
-    if os.path.exists(_CREDENTIALS_PATH):
-        tm = TokenManager.from_json_file(_CREDENTIALS_PATH)
-        print("Authenticated with credentials file.")
+    if client_id and client_secret:
+        tm = TokenManager(client_id=client_id, client_secret=client_secret)
+        print("Authenticated with .env credentials.")
     else:
         tm = None
-        print(
-            "No credentials file found, using anonymous access (reduced rate limits)."
-        )
+        print("No credentials found in .env, using anonymous access.")
 
     with OpenSkyApi(token_manager=tm) as api:
-        # Используем bbox вокруг координат (примерно 2 градуса в каждую сторону)
         bbox = (lat - 2, lat + 2, lon - 2, lon + 2)
         print(f"\n--- Aircraft near {country} (bbox={bbox}) ---")
 

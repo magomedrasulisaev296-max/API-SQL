@@ -1,12 +1,12 @@
 import os
-
+from dotenv import load_dotenv
 from opensky_api import OpenSkyApi, TokenManager
 
 from src.analyzer import Analyzer
 from src.Classes import DBmanager
 from src.openstreetmapapi import get_country_coords
 
-_CREDENTIALS_PATH = "credentials.json"
+load_dotenv()
 
 
 def main():
@@ -14,12 +14,15 @@ def main():
 
     countries = ["Germany", "France", "Spain", "Italy"]
 
-    if os.path.exists(_CREDENTIALS_PATH):
-        tm = TokenManager.from_json_file(_CREDENTIALS_PATH)
-        print("Authenticated with credentials file.")
+    client_id = os.getenv("CLIENT_ID")
+    client_secret = os.getenv("CLIENT_SECRET")
+
+    if client_id and client_secret:
+        tm = TokenManager(client_id=client_id, client_secret=client_secret)
+        print("Authenticated with .env credentials.")
     else:
         tm = None
-        print("No credentials file found, using anonymous access (reduced rate limits).")
+        print("No credentials found in .env, using anonymous access.")
 
     with OpenSkyApi(token_manager=tm) as api:
         for country in countries:
