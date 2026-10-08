@@ -1,53 +1,79 @@
-import os
-from dotenv import load_dotenv
-from opensky_api import OpenSkyApi, TokenManager
+import time
+
+import requests
+
+from src.Classes import DBManager
 from src.openstreetmapapi import get_country_coords
 
-load_dotenv()
 
+def get_states(bbox):
+    """Получение состояний самолётов из OpenSky без токена."""
+    url = "https://opensky-network.org/api/states/all"
+    params = {
+        "lamin": bbox[0],
+        "lamax": bbox[1],
+        "lomin": bbox[2],
+        "lomax": bbox[3],
+    }
+    headers = {"User-Agent": "Mozilla/5.0"}
 
-def fmt_alt(value):
-    return f"{value}m" if value is not None else "None"
+    response = requests.get(url, params=params, headers=headers)
+    if response.status_code == 200:
+        return response.json().get("states") or []
+    print(f"OpenSky error: {response.status_code}")
+    return []
 
 
 def main():
-    country = "Germany"
-    coords = get_country_coords(country)
+    db = DBManager()
 
-    if not coords:
-        print(f"Не удалось получить координаты для {country}")
-        return
+    countries = ["Germany", "France", "Spain", "Italy"]
 
-    lat = float(coords["lat"])
-    lon = float(coords["lon"])
-    print(f"Координаты {country}: lat={lat}, lon={lon}")
+    for country in countries:
+        coords = get_country_coords(country)
+        if not coords:
+            print(f"Не удалось получить координаты для {country}")
+            continue
 
-    client_id = os.getenv("CLIENT_ID")
-    client_secret = os.getenv("CLIENT_SECRET")
+        lat = coords["lat"]
+        lon = coords["lon"]
+        print(f"\n--- {country} (lat={lat}, lon={lon}) ---")
 
-    if client_id and client_secret:
-        tm = TokenManager(client_id=client_id, client_secret=client_secret)
-        print("Authenticated with .env credentials.")
-    else:
-        tm = None
-        print("No credentials found in .env, using anonymous access.")
+        bbox = (lat - 5, lat + 5, lon - 5, lon + 5)
+        states = get_states(bbox)
 
-    with OpenSkyApi(token_manager=tm) as api:
-        bbox = (lat - 2, lat + 2, lon - 2, lon + 2)
-        print(f"\n--- Aircraft near {country} (bbox={bbox}) ---")
+        if states:
+            # Преобразуем сырые списки в объекты, которые ждёт DBManager
+            class State:
+                def __init__(self, row):
+                    self.icao24 = row[0]
+                    self.callsign = row[1]
+                    self.origin_country = row[2]
+                    self.baro_altitude = row[13]
+                    self.geo_altitude = row[13]
+                    self.velocity = row[9]
+                    self.on_ground = row[8]
 
-        states = api.get_states(bbox=bbox)
+            state_objects = [State(row) for row in states]
 
-        if states and states.states:
-            for s in states.states:
-                print(
-                    f"{s.icao24:8s}  {s.callsign or '?':10s}  {s.origin_country:20s}  "
-                    f"baro={fmt_alt(s.baro_altitude)}  "
-                    f"geo={fmt_alt(s.geo_altitude)}  "
-                    f"{'on ground' if s.on_ground else 'airborne'}"
-                )
-        else:
-            print("No states received.")
+            db.insert_all_aeroplanes(state_objects)
+            print(f"Сохранено {len(state_objects)} самолётов для {country}")
+
+        time.sleep(2)  # не спамим API
+
+    # Считаем количество по странам из уже собранных данных
+    from collections import Counter
+    all_data = db.get_all_aeroplanes()
+    counts = Counter(row[3] for row in all_data if row[3])
+    db.insert_countries_and_counts(dict(counts))
+
+    print("\n--- Итог ---")
+    print("Страны:", db.get_countries_and_aeroplanes_count())
+    print("Средняя скорость:", db.get_avg_speed())
+    print("Быстрые:", db.get_aeroplanes_with_higher_speed()[:3])
+    print("ACA:", db.get_aeroplanes_with_keyword("ACA"))
+
+    db.close()
 
 
 if __name__ == "__main__":

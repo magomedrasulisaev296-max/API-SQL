@@ -1,18 +1,37 @@
-from unittest.mock import patch, MagicMock
-from src.Classes import DBmanager
+from unittest.mock import MagicMock, patch
+
+from src.Classes import DBManager
 
 
-@patch("src.Classes.psycopg2.connect")
-def test_dbmanager(mock_connect):
-    mock_conn = MagicMock()
-    mock_cur = MagicMock()
-    mock_conn.cursor.return_value = mock_cur
-    mock_connect.return_value = mock_conn
+def make_db():
+    with patch("src.Classes.psycopg2.connect") as mock_connect:
+        mock_conn = MagicMock()
+        mock_cur = MagicMock()
+        mock_conn.cursor.return_value = mock_cur
+        mock_connect.return_value = mock_conn
+        db = DBManager()
+        return db, mock_conn, mock_cur
 
-    db = DBmanager()
-    assert mock_cur.execute.call_count == 4
 
-    db.insert_countries_and_counts({"Germany": 2})
+def test_create_tables():
+    db, mock_conn, mock_cur = make_db()
+    assert mock_cur.execute.call_count == 2
+    mock_conn.commit.assert_called_once()
+
+
+def test_insert_countries_and_counts():
+    db, mock_conn, mock_cur = make_db()
+    mock_cur.reset_mock()
+    mock_conn.reset_mock()
+    db.insert_countries_and_counts({"Germany": 2, "France": 1})
+    assert mock_cur.execute.call_count == 2
+    mock_conn.commit.assert_called_once()
+
+
+def test_insert_all_aeroplanes():
+    db, mock_conn, mock_cur = make_db()
+    mock_cur.reset_mock()
+    mock_conn.reset_mock()
 
     s = MagicMock()
     s.icao24 = "abc"
@@ -24,11 +43,49 @@ def test_dbmanager(mock_connect):
     s.on_ground = False
 
     db.insert_all_aeroplanes([s])
-    db.insert_avg_speed(150.0)
-    db.insert_high_speed_aircraft([s])
+    mock_cur.execute.assert_called_once()
+    mock_conn.commit.assert_called_once()
 
-    assert db.get_aeroplanes_with_keyword("DLH")
 
+def test_get_countries_and_aeroplanes_count():
+    db, mock_conn, mock_cur = make_db()
+    mock_cur.fetchall.return_value = [("Germany", 2), ("France", 1)]
+    result = db.get_countries_and_aeroplanes_count()
+    assert result == [("Germany", 2), ("France", 1)]
+
+
+def test_get_all_aeroplanes():
+    db, mock_conn, mock_cur = make_db()
+    mock_cur.fetchall.return_value = [("abc",), ("def",)]
+    assert db.get_all_aeroplanes() == [("abc",), ("def",)]
+
+
+def test_get_avg_speed():
+    db, mock_conn, mock_cur = make_db()
+    mock_cur.fetchone.return_value = (150.5,)
+    assert db.get_avg_speed() == 150.5
+
+
+def test_get_avg_speed_none():
+    db, mock_conn, mock_cur = make_db()
+    mock_cur.fetchone.return_value = (None,)
+    assert db.get_avg_speed() == 0.0
+
+
+def test_get_aeroplanes_with_higher_speed():
+    db, mock_conn, mock_cur = make_db()
+    mock_cur.fetchall.return_value = [("fast1",), ("fast2",)]
+    assert len(db.get_aeroplanes_with_higher_speed()) == 2
+
+
+def test_get_aeroplanes_with_keyword():
+    db, mock_conn, mock_cur = make_db()
+    mock_cur.fetchall.return_value = [("ACA123",)]
+    assert db.get_aeroplanes_with_keyword("ACA") == [("ACA123",)]
+
+
+def test_close():
+    db, mock_conn, mock_cur = make_db()
     db.close()
     mock_cur.close.assert_called_once()
     mock_conn.close.assert_called_once()
