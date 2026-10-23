@@ -17,14 +17,18 @@ def test_create_tables():
     db, mock_conn, mock_cur = make_db()
     assert mock_cur.execute.call_count == 2
     mock_conn.commit.assert_called_once()
+    sql = " ".join(str(call[0][0]) for call in mock_cur.execute.call_args_list)
+    assert "COUNT" not in sql
+    assert "countries_count" not in sql
+    assert "all_aircraft" not in sql
 
 
-def test_insert_countries_and_counts():
+def test_insert_country():
     db, mock_conn, mock_cur = make_db()
     mock_cur.reset_mock()
     mock_conn.reset_mock()
-    db.insert_countries_and_counts({"Germany": 2, "France": 1})
-    assert mock_cur.execute.call_count == 2
+    db.insert_country("Germany")
+    mock_cur.execute.assert_called_once()
     mock_conn.commit.assert_called_once()
 
 
@@ -52,6 +56,9 @@ def test_get_countries_and_aeroplanes_count():
     mock_cur.fetchall.return_value = [("Germany", 2), ("France", 1)]
     result = db.get_countries_and_aeroplanes_count()
     assert result == [("Germany", 2), ("France", 1)]
+    sql = mock_cur.execute.call_args[0][0]
+    assert "COUNT(*)" in sql
+    assert "aircrafts" in sql
 
 
 def test_get_all_aeroplanes():

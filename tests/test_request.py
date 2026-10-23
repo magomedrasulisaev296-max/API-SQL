@@ -52,7 +52,7 @@ def test_main_with_data(mock_states, mock_coords, mock_db_cls, mock_sleep):
     main()
 
     assert mock_db.insert_all_aeroplanes.called
-    assert mock_db.insert_countries_and_counts.called
+    assert mock_db.insert_country.called
     mock_db.close.assert_called_once()
 
 

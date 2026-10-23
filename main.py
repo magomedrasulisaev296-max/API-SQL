@@ -1,17 +1,16 @@
 import os
 
 from dotenv import load_dotenv
-from opensky_api import OpenSkyApi, TokenManager
 
-from src.analyzer import Analyzer
-from src.Classes import DBmanager
+from opensky_api import OpenSkyApi, TokenManager
+from src.Classes import DBManager
 from src.openstreetmapapi import get_country_coords
 
 load_dotenv()
 
 
 def main():
-    db = DBmanager()
+    db = DBManager()
 
     countries = ["Germany", "France", "Spain", "Italy"]
 
@@ -41,16 +40,15 @@ def main():
             states = api.get_states(bbox=bbox)
 
             if states and states.states:
-                analyzer = Analyzer(states.states)
-
-                db.insert_countries_and_counts(analyzer.get_countries_and_aeroplanes_count())
-                db.insert_all_aeroplanes(analyzer.get_all_aeroplanes())
-                db.insert_avg_speed(analyzer.get_avg_speed())
-                db.insert_high_speed_aircraft(analyzer.get_aeroplanes_with_higher_speed(threshold=200))
-
+                db.insert_all_aeroplanes(states.states)
+                db.insert_country(country)
                 print(f"Данные для {country} успешно сохранены в БД.")
             else:
                 print(f"Нет данных для {country} (возможно, ограничение частоты запросов).")
+
+    print("\n--- Итог ---")
+    print("Страны:", db.get_countries_and_aeroplanes_count())
+    print("Средняя скорость:", db.get_avg_speed())
 
     db.close()
     print("\nГотово! Все данные загружены.")

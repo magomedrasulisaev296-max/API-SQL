@@ -57,15 +57,10 @@ def main():
             state_objects = [State(row) for row in states]
 
             db.insert_all_aeroplanes(state_objects)
+            db.insert_country(country)
             print(f"Сохранено {len(state_objects)} самолётов для {country}")
 
         time.sleep(2)  # не спамим API
-
-    # Считаем количество по странам из уже собранных данных
-    from collections import Counter
-    all_data = db.get_all_aeroplanes()
-    counts = Counter(row[3] for row in all_data if row[3])
-    db.insert_countries_and_counts(dict(counts))
 
     print("\n--- Итог ---")
     print("Страны:", db.get_countries_and_aeroplanes_count())
